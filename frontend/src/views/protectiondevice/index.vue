@@ -18,6 +18,40 @@
       </article>
     </div>
 
+    <section class="todo-panel">
+      <header class="todo-head">
+        <h3>待办清单<span v-if="openTodos.length" class="todo-count">{{ openTodos.length }}</span></h3>
+        <span class="todo-source">绝缘试验判不合格的记录会自动在这里挂一条，办结后不再提醒</span>
+      </header>
+      <table v-if="openTodos.length" class="data-table todo-table">
+        <thead>
+          <tr>
+            <th>待办事项</th>
+            <th>试验设备</th>
+            <th>试验编号</th>
+            <th>试验信息</th>
+            <th>不合格原因</th>
+            <th>来源时间</th>
+            <th>处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="todo in openTodos" :key="todo.id">
+            <td>{{ todo.title }}</td>
+            <td>{{ todo.device || '—' }}</td>
+            <td>{{ todo.serial || '—' }}</td>
+            <td>{{ todo.detail }}</td>
+            <td class="todo-reason">{{ todo.reason }}</td>
+            <td>{{ formatTime(todo.createdAt) }}</td>
+            <td>
+              <button class="link" type="button" @click="finishTodo(todo.id)">办结</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="todo-empty">暂无绝缘试验不合格带来的待办事项</p>
+    </section>
+
     <p class="status-legend">
       <span v-for="item in statusSummary" :key="item.status" class="legend-item">
         {{ item.status }}：{{ item.count }}
@@ -79,7 +113,11 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import {
+  closeProtectionTodo,
+  listProtectionTodos,
+} from '@/data/protection-todo-store'
+import type { EntryRow, ProtectionTodo } from '@/data/types'
 
 const meta = moduleMeta('protectiondevice')
 const columns = ["装置编号", "所属间隔", "装置型号", "保护类型", "投运日期", "校验周期", "上次校验日", "装置状态"]
@@ -92,12 +130,31 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const openTodos = ref<ProtectionTodo[]>([])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
     count: rows.value.filter((row) => String(row.status) === status).length,
   })),
 )
+
+function refreshTodos() {
+  openTodos.value = listProtectionTodos('待处理')
+}
+
+function finishTodo(id: number) {
+  closeProtectionTodo(id)
+  refreshTodos()
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
 
 function resetFilters() {
   filters.value = {}
@@ -133,5 +190,56 @@ function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  reload()
+  refreshTodos()
+})
 </script>
+
+<style scoped>
+.todo-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.todo-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.todo-head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.todo-count {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  background: #b42318;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 0 6px;
+  margin-left: 4px;
+}
+.todo-source {
+  color: var(--muted);
+  font-size: 12px;
+}
+.todo-table {
+  margin-bottom: 4px;
+}
+.todo-reason {
+  color: #b42318;
+  max-width: 240px;
+}
+.todo-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 0;
+}
+</style>

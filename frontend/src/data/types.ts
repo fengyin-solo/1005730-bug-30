@@ -36,3 +36,17 @@ export type OverviewResult = {
   cards: { label: string; value: number }[]
   modules: { name: string; created: number; pending: number; abnormal: number }[]
 }
+
+// 保护装置台账侧的待办：绝缘试验判不合格后自动挂进来，办结前一直保留。
+export type ProtectionTodo = {
+  id: number
+  source: 'insulationtest'
+  sourceId: number
+  title: string
+  device: string
+  serial: string
+  detail: string
+  reason: string
+  createdAt: string
+  status: '待处理' | '已办结'
+}
