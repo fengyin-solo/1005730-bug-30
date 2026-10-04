@@ -63,6 +63,42 @@
       </tbody>
     </table>
 
+    <section class="todo-panel">
+      <header class="todo-head">
+        <h3>绝缘试验不合格跟踪待办</h3>
+        <span class="todo-count">待办 {{ pendingTodoList.length }} 条 · 已办结 {{ doneTodoList.length }} 条</span>
+        <button class="btn ghost" type="button" @click="reloadTodos">刷新待办</button>
+      </header>
+      <table v-if="todoList.length" class="data-table">
+        <thead>
+          <tr>
+            <th>来源试验编号</th>
+            <th>不合格设备</th>
+            <th>不合格原因</th>
+            <th>挂单日期</th>
+            <th>处理状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="todo in todoList" :key="todo.id" :class="{ 'todo-done': todo.done }">
+            <td>{{ todo.testNo }}</td>
+            <td>{{ todo.equipment }}</td>
+            <td>{{ todo.reason }}</td>
+            <td>{{ todo.createdAt }}</td>
+            <td>
+              <span :class="['status-pill', todo.done ? '' : 'status-fail']">{{ todo.done ? '已办结' : '待处理' }}</span>
+            </td>
+            <td class="row-actions">
+              <button v-if="!todo.done" class="link" type="button" @click="finishTodo(todo.id)">办结</button>
+              <span v-else>—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty-state">没有绝缘试验不合格待办，保护装置台账当前无需跟踪项</p>
+    </section>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条保护装置台账记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -79,7 +115,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import { listTodos, resolveTodo } from '@/api/protection-todo'
+import type { EntryRow, ProtectionTodo } from '@/data/types'
 
 const meta = moduleMeta('protectiondevice')
 const columns = ["装置编号", "所属间隔", "装置型号", "保护类型", "投运日期", "校验周期", "上次校验日", "装置状态"]
@@ -92,6 +129,9 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const todoList = ref<ProtectionTodo[]>([])
+const pendingTodoList = computed(() => todoList.value.filter((todo) => !todo.done))
+const doneTodoList = computed(() => todoList.value.filter((todo) => todo.done))
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -133,5 +173,19 @@ function reload() {
   }
 }
 
-onMounted(reload)
+function reloadTodos() {
+  // 绝缘试验页判不合格写入同一份 localStorage，这里每次进入/刷新都重读。
+  todoList.value = listTodos()
+}
+
+function finishTodo(id: number) {
+  if (resolveTodo(id)) {
+    reloadTodos()
+  }
+}
+
+onMounted(() => {
+  reload()
+  reloadTodos()
+})
 </script>
